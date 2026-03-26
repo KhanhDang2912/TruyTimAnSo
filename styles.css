@@ -17,7 +17,9 @@
   --preview: #ffd166;
   --chip-1: #153f6e;
   --chip-2: #1f5e95;
-  --footer-banner-height: 5px;
+  --footer-banner-height: 75px;
+  --footer-logo-size: 68px;
+  --footer-logo-lift: -8px;
 }
 
 * {
@@ -82,7 +84,7 @@ body.fever-active {
   width: min(1340px, calc(100vw - 24px));
   margin: 0 auto;
   height: calc(100vh - var(--footer-banner-height));
-  padding: 10px 0 12px;
+  padding: 10px 0 calc(var(--footer-banner-height) - 50px);
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 12px;
@@ -93,15 +95,16 @@ body.fever-active {
   left: 0;
   right: 0;
   bottom: 0;
-  min-height: var(--footer-banner-height);
+  height: var(--footer-banner-height);
   padding: 3px 20px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   background:
     linear-gradient(90deg, rgba(4, 18, 31, 0.98), rgba(16, 38, 61, 0.96));
   box-shadow: 0 -18px 30px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(16px);
+  overflow: visible;
   z-index: 40;
 }
 
@@ -112,11 +115,12 @@ body.fever-active {
 }
 
 .school-banner__logo {
-  width: 68px;
-  height: 68px;
+  width: 85px;
+  height: 85px;
   flex: 0 0 auto;
   object-fit: contain;
-  margin-top: -8px;
+  margin-top: var(--footer-logo-lift);
+  margin-bottom: 15px;
   padding: 3px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.98), rgba(221, 236, 255, 0.92));
@@ -126,7 +130,7 @@ body.fever-active {
 .school-banner__text {
   margin: 0;
   color: #f4fbff;
-  font-size: clamp(0.92rem, 1.45vw, 1.16rem);
+  font-size: clamp(0.92rem, 2.45vw, 1.16rem);
   font-weight: 800;
   letter-spacing: 0.075em;
   line-height: 1.08;
@@ -1170,6 +1174,8 @@ body.fever-active .fever-card::after {
 @media (max-width: 920px) {
   :root {
     --footer-banner-height: 78px;
+    --footer-logo-size: 60px;
+    --footer-logo-lift: -6px;
   }
 
   body {
@@ -1267,12 +1273,6 @@ body.fever-active .fever-card::after {
     gap: 12px;
   }
 
-  .school-banner__logo {
-    width: 60px;
-    height: 60px;
-    margin-top: -6px;
-  }
-
   .school-banner__text {
     font-size: 0.86rem;
     letter-spacing: 0.05em;
@@ -1283,6 +1283,8 @@ body.fever-active .fever-card::after {
 @media (max-width: 720px) {
   :root {
     --footer-banner-height: 90px;
+    --footer-logo-size: 52px;
+    --footer-logo-lift: -4px;
   }
 
   .hud {
@@ -1311,12 +1313,6 @@ body.fever-active .fever-card::after {
   .school-banner {
     padding: 4px 12px;
     gap: 10px;
-  }
-
-  .school-banner__logo {
-    width: 52px;
-    height: 52px;
-    margin-top: -4px;
   }
 
   .school-banner__text {
