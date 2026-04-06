@@ -1,7 +1,12 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
-const GAME_DURATION_SECONDS = 90;
+const GAME_DURATION_SECONDS = 120;
 const FEVER_DURATION_MS = 15000;
 const COMBO_WINDOW_MS = 20000;
+const STAGE_INTRO_DURATION_MS = 2000;
+const TUTORIAL_IDLE_DELAY_MS = 100;
+const TUTORIAL_HINT_RESTART_MS = 1700;
+const TUTORIAL_EXIT_FLASH_MS = 800;
+const TUTORIAL_STAGE_BANNER_DURATION_MS = 2300;
 const CORRECT_SCORE = 100;
 const WRONG_SCORE = 50;
 const MASTER_VOLUME = 3.0;
@@ -22,22 +27,91 @@ const STAGE_META = {
   1: {
     title: "Giai đoạn 1",
     name: "Làm quen với độ dốc",
-    description: "Chỉ cần chọn hệ số a để đường thẳng y = ax đi qua đúng điểm mục tiêu."
+    description: "Chọn hệ số a để đường thẳng y = ax đi qua đúng điểm mục tiêu."
   },
   2: {
     title: "Giai đoạn 2",
     name: "Căn chỉnh cao độ",
-    description: "Kết hợp a và b để đường thẳng xuất phát đúng vị trí và chui qua tâm cổng."
+    description: "Kết hợp a và b để đường thẳng xuất phát đúng vị trí và chui qua cổng."
   },
   3: {
     title: "Giai đoạn 3",
     name: "Bẻ cong quỹ đạo",
-    description: "Chọn a để parabol y = ax² ôm trọn dải sao theo đúng bề cong."
+    description: "Chọn a để parabol y = ax² đi qua các sao theo đúng đường cong."
   }
 };
 
-const LEVEL_COUNT = 9;
-const STAGE_SEQUENCE = [1, 1, 1, 2, 2, 2, 3, 3, 3];
+const TUTORIAL_STAGE_DATA = {
+  1: {
+    formula: "linearOrigin",
+    prompt: "Hướng dẫn: Tìm hệ số a để đường thẳng đi qua điểm A(1; 2).",
+    lead: "Màn hướng dẫn này giúp bạn làm quen với cách kéo số từ kho số vào ô phương trình.",
+    solution: {
+      a: 2
+    },
+    targets: [{ x: 1, y: 2, label: "A", style: "star" }],
+    steps: [
+      {
+        sourceValue: 2,
+        slot: "a",
+        value: 2,
+        message: "Kéo số 2 từ kho số vào ô a để đổi độ dốc của đường thẳng."
+      }
+    ]
+  },
+  2: {
+    formula: "linear",
+    prompt: "Hướng dẫn: Kéo a = 1 và b = 2 để đường bắn đi qua S(0; 2) và cổng G(1; 3).",
+    lead: "Sang giai đoạn 2, bạn cần điền cả a và b để dựng đúng đường thẳng.",
+    solution: {
+      a: 1,
+      b: 2
+    },
+    targets: [
+      { x: 0, y: 2, label: "S", style: "anchor" },
+      { x: 1, y: 3, label: "G", style: "center" }
+    ],
+    gate: { x: 1, y: 3, width: 1, height: 1, label: "G" },
+    steps: [
+      {
+        sourceValue: 1,
+        slot: "a",
+        value: 1,
+        message: "Bước 1: Kéo số 1 vào ô a để tạo độ dốc của đường thẳng."
+      },
+      {
+        sourceValue: 2,
+        slot: "b",
+        value: 2,
+        message: "Bước 2: Kéo tiếp số 2 vào ô b để nâng đường thẳng lên đúng vị trí."
+      }
+    ]
+  },
+  3: {
+    formula: "quadratic",
+    prompt: "Hướng dẫn: chọn a = 1 để parabol đi qua ba điểm tại (-1; 1), (0; 0), (1; 1).",
+    lead: "Ở giai đoạn 3, bạn chỉ cần kéo hệ số a vào trước x² để chỉnh độ cong của parabol.",
+    solution: {
+      a: 1
+    },
+    targets: [
+      { x: -1, y: 1, label: "A", style: "star" },
+      { x: 0, y: 0, label: "B", style: "star" },
+      { x: 1, y: 1, label: "C", style: "star" }
+    ],
+    steps: [
+      {
+        sourceValue: 1,
+        slot: "a",
+        value: 1,
+        message: "Kéo số 1 vào ô a để parabol đi qua các ngôi sao."
+      }
+    ]
+  }
+};
+
+const LEVEL_COUNT = 15;
+const STAGE_SEQUENCE = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3];
 const LINEAR_A_VALUES = [-3, -2, -1, -0.5, 0.5, 1, 2, 3];
 const QUADRATIC_A_VALUES = [-2, -1, -0.5, 0.5, 1, 2];
 const GATE_LABELS = ["G", "H", "K", "M", "N", "P"];
@@ -68,7 +142,23 @@ const state = {
   finalCompletionMs: GAME_DURATION_SECONDS * 1000,
   pendingConfirmAction: null,
   confirmResumeOnCancel: false,
-  confirmReturnOverlay: null
+  confirmReturnOverlay: null,
+  tutorialEnabled: true,
+  tutorialShownStages: {},
+  tutorialPendingTimerStart: false,
+  tutorialPendingResume: false,
+  tutorialDemoTimeouts: [],
+  tutorialIdleHandle: null,
+  stageIntroHandle: null,
+  tutorialStageBannerHandle: null,
+  graphFrameSyncHandle: 0,
+  guidanceClockFrozen: false,
+  guidanceClockRemainingMs: 0,
+  guidancePauseStartedAt: 0,
+  guidanceFeverRemainingMs: 0,
+  feverInfoShown: false,
+  pendingSolvedAdvance: false,
+  screenFlashHandle: null
 };
 
 const refs = {};
@@ -600,10 +690,12 @@ function init() {
   renderPalette();
   state.leaderboard = loadLeaderboard();
   bindEvents();
-  state.currentLevel = createRandomLevel(getStageForIndex(0));
+  state.currentLevel = null;
   renderLevel();
   renderLeaderboard();
   refreshStartScreen();
+  refreshTutorialModeUI();
+  updateFeverInfoCopy();
   updateHud();
 }
 
@@ -620,6 +712,9 @@ function cacheRefs() {
   refs.stageTitle = document.getElementById("stageTitle");
   refs.levelInstruction = document.getElementById("levelInstruction");
   refs.formulaArea = document.getElementById("formulaArea");
+  refs.graphPanel = document.querySelector(".graph-panel");
+  refs.graphHeader = document.querySelector(".graph-header");
+  refs.graphFrame = document.querySelector(".graph-frame");
   refs.palette = document.getElementById("palette");
   refs.gameRestartBtn = document.getElementById("gameRestartBtn");
   refs.homeBtn = document.getElementById("homeBtn");
@@ -637,6 +732,23 @@ function cacheRefs() {
   refs.leaderboardOverlay = document.getElementById("leaderboardOverlay");
   refs.confirmOverlay = document.getElementById("confirmOverlay");
   refs.countdownOverlay = document.getElementById("countdownOverlay");
+  refs.stageIntroOverlay = document.getElementById("stageIntroOverlay");
+  refs.stageIntroTitle = document.getElementById("stageIntroTitle");
+  refs.stageIntroSubtitle = document.getElementById("stageIntroSubtitle");
+  refs.stageIntroLead = document.getElementById("stageIntroLead");
+  refs.tutorialStageBannerOverlay = document.getElementById("tutorialStageBannerOverlay");
+  refs.tutorialStageBannerTitle = document.getElementById("tutorialStageBannerTitle");
+  refs.tutorialStageBannerSubtitle = document.getElementById("tutorialStageBannerSubtitle");
+  refs.feverInfoOverlay = document.getElementById("feverInfoOverlay");
+  refs.feverInfoLead = document.getElementById("feverInfoLead");
+  refs.feverInfoDuration = document.getElementById("feverInfoDuration");
+  refs.feverInfoTrigger = document.getElementById("feverInfoTrigger");
+  refs.feverInfoContinueBtn = document.getElementById("feverInfoContinueBtn");
+  refs.tutorialHintLayer = document.getElementById("tutorialHintLayer");
+  refs.tutorialHintBubble = document.getElementById("tutorialHintBubble");
+  refs.tutorialHintText = document.getElementById("tutorialHintText");
+  refs.tutorialHintGhost = document.getElementById("tutorialHintGhost");
+  refs.screenFlashOverlay = document.getElementById("screenFlashOverlay");
   refs.startBtn = document.getElementById("startBtn");
   refs.restartBtn = document.getElementById("restartBtn");
   refs.endExitBtn = document.getElementById("endExitBtn");
@@ -648,6 +760,13 @@ function cacheRefs() {
   refs.confirmStartBtn = document.getElementById("confirmStartBtn");
   refs.playerNameInput = document.getElementById("playerNameInput");
   refs.nameError = document.getElementById("nameError");
+  refs.tutorialModeBtn = document.getElementById("tutorialModeBtn");
+  refs.tutorialModeHint = document.getElementById("tutorialModeHint");
+  refs.endTutorialModeBtn = document.getElementById("endTutorialModeBtn");
+  refs.endTutorialModeHint = document.getElementById("endTutorialModeHint");
+  refs.confirmTutorialToggleCard = document.getElementById("confirmTutorialToggleCard");
+  refs.confirmTutorialModeBtn = document.getElementById("confirmTutorialModeBtn");
+  refs.confirmTutorialModeHint = document.getElementById("confirmTutorialModeHint");
   refs.leaderboardList = document.getElementById("leaderboardList");
   refs.countdownValue = document.getElementById("countdownValue");
   refs.countdownName = document.getElementById("countdownName");
@@ -661,12 +780,24 @@ function cacheRefs() {
   refs.confirmMessage = document.getElementById("confirmMessage");
   refs.confirmCancelBtn = document.getElementById("confirmCancelBtn");
   refs.confirmAcceptBtn = document.getElementById("confirmAcceptBtn");
+  refs.tutorialOverlay = document.getElementById("tutorialOverlay");
+  refs.tutorialStageKicker = document.getElementById("tutorialStageKicker");
+  refs.tutorialTitle = document.getElementById("tutorialTitle");
+  refs.tutorialLead = document.getElementById("tutorialLead");
+  refs.tutorialFormulaLabel = document.getElementById("tutorialFormulaLabel");
+  refs.tutorialPlayground = document.getElementById("tutorialPlayground");
+  refs.tutorialFormulaArea = document.getElementById("tutorialFormulaArea");
+  refs.tutorialPalette = document.getElementById("tutorialPalette");
+  refs.tutorialCallout = document.getElementById("tutorialCallout");
+  refs.tutorialCalloutText = document.getElementById("tutorialCalloutText");
+  refs.tutorialGhostChip = document.getElementById("tutorialGhostChip");
+  refs.tutorialContinueBtn = document.getElementById("tutorialContinueBtn");
   refs.scoreBanner = document.getElementById("scoreBanner");
 }
 
 function bindEvents() {
   refs.startBtn.addEventListener("click", openNameOverlay);
-  refs.restartBtn.addEventListener("click", restartWithCurrentPlayer);
+  refs.restartBtn.addEventListener("click", confirmRestartAfterFinish);
   refs.gameRestartBtn.addEventListener("click", confirmRestartCurrentGame);
   refs.endExitBtn.addEventListener("click", () => confirmExitToStart(refs.endOverlay));
   refs.resumeBtn.addEventListener("click", resumeGame);
@@ -680,6 +811,11 @@ function bindEvents() {
   refs.confirmAcceptBtn.addEventListener("click", () => closeConfirmOverlay(true));
   refs.nameBackBtn.addEventListener("click", returnToStart);
   refs.confirmStartBtn.addEventListener("click", confirmPlayerAndStart);
+  [refs.tutorialModeBtn, refs.endTutorialModeBtn, refs.confirmTutorialModeBtn]
+    .filter(Boolean)
+    .forEach((button) => button.addEventListener("click", toggleTutorialMode));
+  refs.tutorialContinueBtn.addEventListener("click", closeTutorialOverlay);
+  refs.feverInfoContinueBtn.addEventListener("click", closeFeverInfoOverlay);
   refs.playerNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -710,14 +846,636 @@ function bindEvents() {
   document.addEventListener("pointerup", onPointerUp);
   document.addEventListener("pointercancel", cancelDrag);
   window.addEventListener("blur", cancelDrag);
+  window.addEventListener("resize", requestGraphFrameSync);
+  document.addEventListener("fullscreenchange", requestGraphFrameSync);
+}
+
+function toggleTutorialMode() {
+  state.tutorialEnabled = !state.tutorialEnabled;
+  refreshTutorialModeUI();
+}
+
+function refreshTutorialModeUI() {
+  if (!refs.tutorialModeBtn || !refs.tutorialModeHint) {
+    return;
+  }
+
+  refs.tutorialModeBtn.textContent = state.tutorialEnabled ? "Bật" : "Tắt";
+  refs.tutorialModeBtn.setAttribute("aria-pressed", state.tutorialEnabled ? "true" : "false");
+  refs.tutorialModeBtn.classList.toggle("is-off", !state.tutorialEnabled);
+  refs.tutorialModeHint.textContent = state.tutorialEnabled
+    ? "Mỗi giai đoạn sẽ có màn hướng dẫn tương tác ngay trên bàn chơi."
+    : "Tắt nếu bạn muốn bỏ qua các màn hướng dẫn và vào thẳng màn chính.";
+}
+
+function refreshTutorialModeUI() {
+  if (!refs.tutorialModeBtn) {
+    return;
+  }
+
+  const buttons = [refs.tutorialModeBtn, refs.endTutorialModeBtn, refs.confirmTutorialModeBtn].filter(Boolean);
+  const pressed = state.tutorialEnabled ? "true" : "false";
+  const label = state.tutorialEnabled ? "Tắt chế độ hướng dẫn" : "Bật chế độ hướng dẫn";
+
+  document.querySelectorAll(".tutorial-toggle-copy strong").forEach((node) => {
+    node.textContent = "Chế độ hướng dẫn";
+  });
+
+  buttons.forEach((button) => {
+    button.innerHTML = '<span class="tutorial-toggle-btn__track"><span class="tutorial-toggle-btn__thumb"></span></span>';
+    button.setAttribute("aria-pressed", pressed);
+    button.setAttribute("aria-label", label);
+    button.classList.toggle("is-off", !state.tutorialEnabled);
+  });
+
+  if (refs.tutorialModeHint) {
+    refs.tutorialModeHint.textContent = state.tutorialEnabled
+      ? "Mỗi giai đoạn sẽ có màn hướng dẫn tương tác ngay trên bàn chơi."
+      : "Tắt nếu bạn muốn vào thẳng màn chính mà không hiện hướng dẫn.";
+  }
+
+  if (refs.endTutorialModeHint) {
+    refs.endTutorialModeHint.textContent = state.tutorialEnabled
+      ? "Ván sau sẽ tiếp tục hiện màn hướng dẫn ở từng giai đoạn."
+      : "Ván sau sẽ bỏ qua các màn hướng dẫn giai đoạn.";
+  }
+
+  if (refs.confirmTutorialModeHint) {
+    refs.confirmTutorialModeHint.textContent = state.tutorialEnabled
+      ? "Ván chơi lại sẽ hiện hướng dẫn ở các giai đoạn."
+      : "Ván chơi lại sẽ bỏ qua các màn hướng dẫn.";
+  }
+}
+
+function refreshTutorialModeUI() {
+  if (!refs.tutorialModeBtn) {
+    return;
+  }
+
+  const buttons = [refs.tutorialModeBtn, refs.endTutorialModeBtn, refs.confirmTutorialModeBtn].filter(Boolean);
+  const pressed = state.tutorialEnabled ? "true" : "false";
+  const label = state.tutorialEnabled ? "Tắt chế độ hướng dẫn" : "Bật chế độ hướng dẫn";
+
+  document.querySelectorAll(".tutorial-toggle-copy strong").forEach((node) => {
+    node.textContent = "Chế độ hướng dẫn";
+  });
+
+  buttons.forEach((button) => {
+    button.innerHTML = '<span class="tutorial-toggle-btn__track"><span class="tutorial-toggle-btn__thumb"></span></span>';
+    button.setAttribute("aria-pressed", pressed);
+    button.setAttribute("aria-label", label);
+    button.classList.toggle("is-off", !state.tutorialEnabled);
+  });
+
+  if (refs.tutorialModeHint) {
+    refs.tutorialModeHint.textContent = state.tutorialEnabled
+      ? "Mỗi giai đoạn sẽ có màn hướng dẫn tương tác ngay trên bàn chơi."
+      : "Tắt nếu bạn muốn vào thẳng màn chính mà không hiện hướng dẫn.";
+  }
+
+  if (refs.endTutorialModeHint) {
+    refs.endTutorialModeHint.textContent = state.tutorialEnabled
+      ? "Ván sau sẽ tiếp tục hiện màn hướng dẫn ở từng giai đoạn."
+      : "Ván sau sẽ bỏ qua các màn hướng dẫn giai đoạn.";
+  }
+
+  if (refs.confirmTutorialModeHint) {
+    refs.confirmTutorialModeHint.textContent = state.tutorialEnabled
+      ? "Ván chơi lại sẽ hiện hướng dẫn ở các giai đoạn."
+      : "Ván chơi lại sẽ bỏ qua các màn hướng dẫn.";
+  }
+}
+
+function refreshTutorialModeUI() {
+  if (!refs.tutorialModeBtn) {
+    return;
+  }
+
+  const buttons = [refs.tutorialModeBtn, refs.endTutorialModeBtn, refs.confirmTutorialModeBtn].filter(Boolean);
+  const pressed = state.tutorialEnabled ? "true" : "false";
+  const checked = state.tutorialEnabled ? "true" : "false";
+  const label = state.tutorialEnabled ? "Tắt chế độ hướng dẫn" : "Bật chế độ hướng dẫn";
+
+  document.querySelectorAll(".tutorial-toggle-copy strong").forEach((node) => {
+    node.textContent = "Chế độ hướng dẫn";
+  });
+
+  buttons.forEach((button) => {
+    button.innerHTML = '<span class="tutorial-toggle-btn__track"><span class="tutorial-toggle-btn__thumb"></span></span>';
+    button.setAttribute("role", "switch");
+    button.setAttribute("aria-pressed", pressed);
+    button.setAttribute("aria-checked", checked);
+    button.setAttribute("aria-label", label);
+    button.classList.toggle("is-off", !state.tutorialEnabled);
+  });
+
+  if (refs.tutorialModeHint) {
+    refs.tutorialModeHint.textContent = state.tutorialEnabled
+      ? "Mỗi giai đoạn sẽ có màn hướng dẫn tương tác ngay trên bàn chơi."
+      : "Tắt nếu bạn muốn vào thẳng màn chính mà không hiện hướng dẫn.";
+  }
+
+  if (refs.endTutorialModeHint) {
+    refs.endTutorialModeHint.textContent = state.tutorialEnabled
+      ? "Ván sau sẽ tiếp tục hiện màn hướng dẫn ở từng giai đoạn."
+      : "Ván sau sẽ bỏ qua các màn hướng dẫn giai đoạn.";
+  }
+
+  if (refs.confirmTutorialModeHint) {
+    refs.confirmTutorialModeHint.textContent = state.tutorialEnabled
+      ? "Ván chơi lại sẽ hiện hướng dẫn ở các giai đoạn."
+      : "Ván chơi lại sẽ bỏ qua các màn hướng dẫn.";
+  }
+}
+
+function resetTutorialProgress() {
+  state.tutorialShownStages = {};
+  state.tutorialPendingTimerStart = false;
+  state.tutorialPendingResume = false;
+  state.guidanceClockFrozen = false;
+  state.guidanceClockRemainingMs = 0;
+  state.guidancePauseStartedAt = 0;
+  state.guidanceFeverRemainingMs = 0;
+  state.feverInfoShown = false;
+  state.pendingSolvedAdvance = false;
+  setTutorialVisualState(false);
+  clearStageIntroTimer();
+  clearTutorialStageBannerTimer();
+  clearTutorialIdleTimer();
+  hideScreenFlash();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  if (refs.stageIntroOverlay) {
+    showOverlay(refs.stageIntroOverlay, false);
+  }
+  if (refs.tutorialStageBannerOverlay) {
+    showOverlay(refs.tutorialStageBannerOverlay, false);
+  }
+  if (refs.feverInfoOverlay) {
+    showOverlay(refs.feverInfoOverlay, false);
+  }
+  if (refs.tutorialOverlay) {
+    showOverlay(refs.tutorialOverlay, false);
+  }
+}
+
+function clearStageIntroTimer() {
+  if (state.stageIntroHandle) {
+    window.clearTimeout(state.stageIntroHandle);
+    state.stageIntroHandle = null;
+  }
+}
+
+function clearTutorialStageBannerTimer() {
+  if (state.tutorialStageBannerHandle) {
+    window.clearTimeout(state.tutorialStageBannerHandle);
+    state.tutorialStageBannerHandle = null;
+  }
+}
+
+function clearTutorialIdleTimer() {
+  if (state.tutorialIdleHandle) {
+    window.clearTimeout(state.tutorialIdleHandle);
+    state.tutorialIdleHandle = null;
+  }
+}
+
+function clearScreenFlashTimer() {
+  if (state.screenFlashHandle) {
+    window.clearTimeout(state.screenFlashHandle);
+    state.screenFlashHandle = null;
+  }
+}
+
+function requestGraphFrameSync() {
+  if (state.graphFrameSyncHandle) {
+    window.cancelAnimationFrame(state.graphFrameSyncHandle);
+  }
+  state.graphFrameSyncHandle = window.requestAnimationFrame(() => {
+    state.graphFrameSyncHandle = 0;
+    syncGraphFrameHeight();
+  });
+}
+
+function syncGraphFrameHeight() {
+  if (!refs.graphPanel || !refs.graphFrame || !refs.graphHeader || !refs.homeBtn) {
+    return;
+  }
+
+  if (window.innerWidth <= 920) {
+    refs.graphFrame.style.height = "";
+    return;
+  }
+
+  const panelRect = refs.graphPanel.getBoundingClientRect();
+  const frameRect = refs.graphFrame.getBoundingClientRect();
+  const buttonRect = refs.homeBtn.getBoundingClientRect();
+  const panelStyles = window.getComputedStyle(refs.graphPanel);
+  const paddingBottom = Number.parseFloat(panelStyles.paddingBottom) || 0;
+  const frameOffsetTop = frameRect.top - panelRect.top;
+  const desiredHeight = Math.round(buttonRect.bottom - panelRect.top - frameOffsetTop - paddingBottom);
+
+  if (desiredHeight > 280) {
+    refs.graphFrame.style.height = `${desiredHeight}px`;
+  } else {
+    refs.graphFrame.style.height = "";
+  }
+}
+
+function hideScreenFlash() {
+  clearScreenFlashTimer();
+  if (!refs.screenFlashOverlay) {
+    return;
+  }
+  refs.screenFlashOverlay.classList.remove("is-visible");
+  refs.screenFlashOverlay.setAttribute("aria-hidden", "true");
+}
+
+function playScreenFlash(onComplete) {
+  if (!refs.screenFlashOverlay) {
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+    return;
+  }
+
+  clearScreenFlashTimer();
+  refs.screenFlashOverlay.classList.add("is-visible");
+  refs.screenFlashOverlay.setAttribute("aria-hidden", "false");
+  state.screenFlashHandle = window.setTimeout(() => {
+    state.screenFlashHandle = null;
+    refs.screenFlashOverlay.classList.remove("is-visible");
+    refs.screenFlashOverlay.setAttribute("aria-hidden", "true");
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, TUTORIAL_EXIT_FLASH_MS);
+}
+
+function setTutorialVisualState(active) {
+  refs.body.classList.toggle("tutorial-active", Boolean(active));
+}
+
+function clearTutorialDemoTimers() {
+  state.tutorialDemoTimeouts.forEach((handle) => window.clearTimeout(handle));
+  state.tutorialDemoTimeouts = [];
+}
+
+function queueTutorialTimeout(callback, delay) {
+  const handle = window.setTimeout(() => {
+    state.tutorialDemoTimeouts = state.tutorialDemoTimeouts.filter((item) => item !== handle);
+    callback();
+  }, delay);
+  state.tutorialDemoTimeouts.push(handle);
+  return handle;
+}
+
+function isFirstLevelOfStage(index) {
+  return index === 0 || getStageForIndex(index) !== getStageForIndex(index - 1);
+}
+
+function isTutorialLevel(level = state.currentLevel) {
+  return Boolean(level && level.isTutorial);
+}
+
+function getRemainingTimeMs() {
+  if (state.isPaused) {
+    return state.pausedRemainingMs;
+  }
+  if (state.guidanceClockFrozen) {
+    return state.guidanceClockRemainingMs;
+  }
+  return Math.max(0, state.deadline - Date.now());
+}
+
+function freezeClockForGuidance() {
+  if (state.guidanceClockFrozen) {
+    return;
+  }
+  const now = Date.now();
+  state.guidanceClockRemainingMs = Math.max(0, state.deadline - now);
+  state.guidancePauseStartedAt = now;
+  state.guidanceFeverRemainingMs = Math.max(0, state.feverUntil - now);
+  state.feverUntil = 0;
+  state.guidanceClockFrozen = true;
+  clearTimer();
+  updateHud(state.guidanceClockRemainingMs);
+}
+
+function resumeClockAfterGuidance() {
+  if (!state.guidanceClockFrozen) {
+    if (state.running && !state.isPaused && !state.timerHandle) {
+      startTimerLoop();
+    }
+    return;
+  }
+
+  const remainingMs = state.guidanceClockRemainingMs;
+  const pauseDuration = state.guidancePauseStartedAt ? Date.now() - state.guidancePauseStartedAt : 0;
+  state.recentSolveTimes = state.recentSolveTimes.map((time) => time + pauseDuration);
+  state.guidanceClockFrozen = false;
+  state.guidanceClockRemainingMs = 0;
+  state.guidancePauseStartedAt = 0;
+  state.deadline = Date.now() + remainingMs;
+  state.feverUntil = state.guidanceFeverRemainingMs > 0 ? Date.now() + state.guidanceFeverRemainingMs : 0;
+  state.guidanceFeverRemainingMs = 0;
+  updateHud(remainingMs);
+
+  if (state.running && !state.isPaused) {
+    startTimerLoop();
+  }
+}
+
+function createTutorialLevel(stage) {
+  const stageMeta = STAGE_META[stage];
+  const tutorial = TUTORIAL_STAGE_DATA[stage];
+  if (!stageMeta || !tutorial) {
+    return createRandomLevel(stage);
+  }
+
+  return {
+    id: `T-${stage}-${Date.now()}-${Math.random()}`,
+    stage,
+    formula: tutorial.formula,
+    slots: Object.keys(tutorial.solution),
+    prompt: tutorial.prompt,
+    targets: tutorial.targets.map((target) => ({ ...target })),
+    gate: tutorial.gate ? { ...tutorial.gate } : undefined,
+    isTutorial: true,
+    tutorialLead: tutorial.lead,
+    tutorialSteps: tutorial.steps.map((step) => ({ ...step })),
+    solution: { ...tutorial.solution },
+    baseScore: 0
+  };
+}
+
+function updateFeverInfoCopy() {
+  if (refs.feverInfoLead) {
+    refs.feverInfoLead.textContent = "";
+  }
+  if (refs.feverInfoDuration) {
+    refs.feverInfoDuration.textContent = `Fever kéo dài ${FEVER_DURATION_MS / 1000} giây.`;
+  }
+}
+
+function showStageIntro(stage, onComplete) {
+  const stageMeta = STAGE_META[stage];
+  if (!stageMeta || !refs.stageIntroOverlay) {
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+    return;
+  }
+
+  clearStageIntroTimer();
+  refs.stageIntroTitle.textContent = stageMeta.title.toUpperCase();
+  refs.stageIntroSubtitle.textContent = stageMeta.name;
+  refs.stageIntroLead.textContent = state.tutorialEnabled && !state.tutorialShownStages[stage]
+    ? `${stageMeta.description} Màn hướng dẫn ngắn sẽ xuất hiện ngay sau đây.`
+    : stageMeta.description;
+  showOverlay(refs.stageIntroOverlay, true);
+
+  state.stageIntroHandle = window.setTimeout(() => {
+    state.stageIntroHandle = null;
+    showOverlay(refs.stageIntroOverlay, false);
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, STAGE_INTRO_DURATION_MS);
+}
+
+function beginStageSequence(stage, options = {}) {
+  const { freezeClock = true } = options;
+
+  clearStageIntroTimer();
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  setTutorialVisualState(false);
+  audioSystem.pauseMusic();
+
+  if (freezeClock) {
+    freezeClockForGuidance();
+  }
+
+  showStageIntro(stage, () => {
+    if (!state.running || state.currentLevelIndex >= LEVEL_COUNT) {
+      return;
+    }
+    finishStageSequence(stage);
+  });
+}
+
+function finishStageSequence(stage) {
+  const stageMeta = STAGE_META[stage];
+  const shouldRunTutorial = state.tutorialEnabled && !state.tutorialShownStages[stage];
+
+  if (shouldRunTutorial) {
+    state.tutorialShownStages[stage] = true;
+    state.currentLevel = createTutorialLevel(stage);
+    setTutorialVisualState(true);
+    renderLevel();
+    updateHud(getRemainingTimeMs());
+    setStatus(`Màn hướng dẫn ${stageMeta.title.toLowerCase()} đã sẵn sàng. Hãy kéo số đúng vào phương trình.`, "neutral");
+    scheduleTutorialHint(260);
+    return;
+  }
+
+  state.currentLevel = createRandomLevel(stage);
+  setTutorialVisualState(false);
+  renderLevel();
+  updateHud(getRemainingTimeMs());
+  resumeClockAfterGuidance();
+
+  if (stage === 1) {
+    setStatus(`90 giây bắt đầu cho ${formatPlayerName(state.playerName)}. Kéo số để tìm quỹ đạo đường bắn.`, "neutral");
+  } else {
+    setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Kéo số để giải màn chính.`, "neutral");
+  }
+}
+
+function hideTutorialHint() {
+  refs.formulaArea.querySelectorAll(".tutorial-drop-target").forEach((slot) => {
+    slot.classList.remove("tutorial-drop-target");
+  });
+
+  if (refs.tutorialHintBubble) {
+    refs.tutorialHintBubble.classList.remove("is-visible");
+    refs.tutorialHintBubble.style.left = "";
+    refs.tutorialHintBubble.style.top = "";
+    refs.tutorialHintBubble.style.setProperty("--tutorial-hint-arrow-offset", "50%");
+  }
+
+  if (refs.tutorialHintGhost) {
+    refs.tutorialHintGhost.classList.remove("is-visible", "is-animating");
+    refs.tutorialHintGhost.style.transform = "translate(-999px, -999px)";
+  }
+
+  if (!refs.tutorialHintLayer) {
+    return;
+  }
+
+  refs.tutorialHintLayer.classList.remove("is-visible");
+  refs.tutorialHintLayer.setAttribute("aria-hidden", "true");
+}
+
+function shouldShowTutorialHint() {
+  return state.running && !state.isPaused && state.tutorialEnabled && isTutorialLevel() && Boolean(refs.tutorialHintLayer);
+}
+
+function findPaletteChipByValue(value) {
+  return refs.palette.querySelector(`[data-value="${String(value)}"]`);
+}
+
+function getCurrentTutorialStep(level = getCurrentLevel()) {
+  if (!level || !level.tutorialSteps) {
+    return null;
+  }
+
+  return level.tutorialSteps.find((step) => state.placements[step.slot] !== step.value) || null;
+}
+
+function scheduleTutorialHint(delay = TUTORIAL_IDLE_DELAY_MS) {
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+
+  if (!shouldShowTutorialHint()) {
+    return;
+  }
+
+  state.tutorialIdleHandle = window.setTimeout(() => {
+    state.tutorialIdleHandle = null;
+    if (!shouldShowTutorialHint()) {
+      return;
+    }
+    if (state.drag) {
+      scheduleTutorialHint(420);
+      return;
+    }
+    runTutorialHintCycle();
+  }, delay);
+}
+
+function noteTutorialInteraction() {
+  if (!shouldShowTutorialHint()) {
+    return;
+  }
+  scheduleTutorialHint();
+}
+
+function runTutorialHintCycle() {
+  clearTutorialDemoTimers();
+
+  if (!shouldShowTutorialHint()) {
+    return;
+  }
+
+  const step = getCurrentTutorialStep();
+  if (!step) {
+    hideTutorialHint();
+    return;
+  }
+
+  const sourceChip = findPaletteChipByValue(step.sourceValue !== undefined ? step.sourceValue : step.value);
+  const targetSlot = refs.formulaArea.querySelector(`[data-slot="${step.slot}"]`);
+  if (!sourceChip || !targetSlot || !refs.tutorialHintGhost || !refs.tutorialHintBubble) {
+    scheduleTutorialHint(260);
+    return;
+  }
+
+  refs.tutorialHintText.textContent = step.message;
+  refs.tutorialHintGhost.textContent = formatNumber(step.value);
+  refs.tutorialHintLayer.classList.add("is-visible");
+  refs.tutorialHintLayer.setAttribute("aria-hidden", "false");
+  refs.tutorialHintBubble.classList.add("is-visible");
+  targetSlot.classList.add("tutorial-drop-target");
+  positionTutorialHintBubble(sourceChip);
+  placeTutorialHintGhost(sourceChip, false);
+  refs.tutorialHintGhost.classList.add("is-visible");
+
+  queueTutorialTimeout(() => {
+    placeTutorialHintGhost(targetSlot, true);
+  }, 70);
+
+  queueTutorialTimeout(() => {
+    if (!shouldShowTutorialHint() || state.drag) {
+      return;
+    }
+    runTutorialHintCycle();
+  }, TUTORIAL_HINT_RESTART_MS);
+}
+
+function positionTutorialHintBubble(sourceChip) {
+  if (!refs.tutorialHintBubble) {
+    return;
+  }
+
+  const chipRect = sourceChip.getBoundingClientRect();
+  const bubbleWidth = refs.tutorialHintBubble.offsetWidth || 300;
+  const chipCenter = chipRect.left + chipRect.width / 2;
+  const top = Math.max(12, chipRect.top - 92);
+  const left = clamp(chipCenter - bubbleWidth / 2, 8, window.innerWidth - bubbleWidth - 8);
+  const arrowOffset = clamp(chipCenter - left, 24, bubbleWidth - 24);
+
+  refs.tutorialHintBubble.style.left = `${left}px`;
+  refs.tutorialHintBubble.style.top = `${top}px`;
+  refs.tutorialHintBubble.style.setProperty("--tutorial-hint-arrow-offset", `${arrowOffset}px`);
+}
+
+function placeTutorialHintGhost(targetEl, animate) {
+  if (!refs.tutorialHintGhost) {
+    return;
+  }
+
+  const targetRect = targetEl.getBoundingClientRect();
+  const ghostRect = refs.tutorialHintGhost.getBoundingClientRect();
+  const x = targetRect.left + targetRect.width / 2 - ghostRect.width / 2;
+  const y = targetRect.top + targetRect.height / 2 - ghostRect.height / 2;
+
+  refs.tutorialHintGhost.classList.toggle("is-animating", animate);
+  if (!animate) {
+    refs.tutorialHintGhost.style.transform = `translate(${x}px, ${y}px)`;
+    void refs.tutorialHintGhost.getBoundingClientRect();
+    return;
+  }
+  refs.tutorialHintGhost.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+function openFeverInfoOverlay() {
+  updateFeverInfoCopy();
+  hideTutorialHint();
+  showOverlay(refs.feverInfoOverlay, true);
+}
+
+async function closeFeverInfoOverlay() {
+  showOverlay(refs.feverInfoOverlay, false);
+  if (state.isPaused) {
+    await resumeGame();
+  }
+  if (state.pendingSolvedAdvance) {
+    state.pendingSolvedAdvance = false;
+    continueSolvedAdvance();
+  }
+}
+
+function closeTutorialOverlay() {
+  if (refs.tutorialOverlay) {
+    showOverlay(refs.tutorialOverlay, false);
+  }
 }
 
 function openNameOverlay() {
   clearCountdown();
   resetConfirmState();
+  clearStageIntroTimer();
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
   refs.nameError.classList.remove("is-visible");
   refs.nameError.textContent = "Hãy nhập tên trước khi bắt đầu.";
   refs.playerNameInput.value = "";
+  refreshTutorialModeUI();
 
   showOverlay(refs.startOverlay, false);
   showOverlay(refs.endOverlay, false);
@@ -725,6 +1483,12 @@ function openNameOverlay() {
   showOverlay(refs.leaderboardOverlay, false);
   showOverlay(refs.confirmOverlay, false);
   showOverlay(refs.countdownOverlay, false);
+  showOverlay(refs.stageIntroOverlay, false);
+  showOverlay(refs.tutorialStageBannerOverlay, false);
+  showOverlay(refs.feverInfoOverlay, false);
+  hideScreenFlash();
+  showOverlay(refs.tutorialOverlay, false);
+  setTutorialVisualState(false);
   showOverlay(refs.nameOverlay, true);
 
   window.setTimeout(() => {
@@ -762,6 +1526,31 @@ function confirmRestartCurrentGame() {
     resumeOnCancel: state.running,
     onConfirm: restartWithCurrentPlayer
   });
+  if (refs.confirmTutorialToggleCard) {
+    refs.confirmTutorialToggleCard.classList.remove("is-hidden");
+  }
+  refreshTutorialModeUI();
+}
+
+function confirmRestartAfterFinish() {
+  if (!state.playerName) {
+    openNameOverlay();
+    return;
+  }
+
+  requestConfirmation({
+    title: "Chơi lại ván mới?",
+    message: "Bạn sẽ quay về đếm ngược 3 giây và bắt đầu lại từ giai đoạn 1.",
+    acceptLabel: "Chơi lại",
+    acceptTone: "primary",
+    resumeOnCancel: false,
+    returnOverlay: refs.endOverlay,
+    onConfirm: restartWithCurrentPlayer
+  });
+  if (refs.confirmTutorialToggleCard) {
+    refs.confirmTutorialToggleCard.classList.remove("is-hidden");
+  }
+  refreshTutorialModeUI();
 }
 
 async function restartWithCurrentPlayer() {
@@ -786,6 +1575,9 @@ function confirmExitToStart(returnOverlay = null) {
     returnOverlay: targetOverlay,
     onConfirm: returnToStart
   });
+  if (refs.confirmTutorialToggleCard) {
+    refs.confirmTutorialToggleCard.classList.add("is-hidden");
+  }
 }
 
 function prepareReplayCountdown() {
@@ -794,6 +1586,7 @@ function prepareReplayCountdown() {
   clearCountdown();
   hideScoreBanner();
   resetConfirmState();
+  resetTutorialProgress();
   audioSystem.stopMusic();
 
   state.running = false;
@@ -870,6 +1663,9 @@ function resetConfirmState() {
   state.pendingConfirmAction = null;
   state.confirmResumeOnCancel = false;
   state.confirmReturnOverlay = null;
+  if (refs.confirmTutorialToggleCard) {
+    refs.confirmTutorialToggleCard.classList.add("is-hidden");
+  }
   if (refs.confirmAcceptBtn) {
     refs.confirmAcceptBtn.classList.remove("danger-btn");
     refs.confirmAcceptBtn.textContent = "Xác nhận";
@@ -921,12 +1717,13 @@ function startGame() {
   clearCountdown();
   hideScoreBanner();
   resetConfirmState();
+  resetTutorialProgress();
 
   state.started = true;
   state.running = true;
   state.isPaused = false;
   state.currentLevelIndex = 0;
-  state.currentLevel = createRandomLevel(getStageForIndex(0));
+  state.currentLevel = null;
   state.placements = {};
   state.score = 0;
   state.solvedCount = 0;
@@ -946,17 +1743,23 @@ function startGame() {
   showOverlay(refs.leaderboardOverlay, false);
   showOverlay(refs.confirmOverlay, false);
   showOverlay(refs.countdownOverlay, false);
+  showOverlay(refs.stageIntroOverlay, false);
+  showOverlay(refs.tutorialStageBannerOverlay, false);
+  showOverlay(refs.feverInfoOverlay, false);
+  hideScreenFlash();
   refs.pauseBtn.textContent = "Tạm dừng";
-  setStatus(`90 giây bắt đầu cho ${formatPlayerName(state.playerName)}. Kéo số để khóa quỹ đạo đường bắn.`, "neutral");
-  renderLevel();
-  updateHud();
-  startTimerLoop();
+  setStatus(`120 giây bắt đầu cho ${formatPlayerName(state.playerName)}. Kéo số để tìm quỹ đạo đường bắn.`, "neutral");
+  updateHud(GAME_DURATION_SECONDS * 1000);
+  beginStageSequence(getStageForIndex(0), { freezeClock: true });
 }
 
 function startTimerLoop() {
+  if (state.guidanceClockFrozen || state.isPaused || !state.running) {
+    return;
+  }
   clearTimer();
   state.timerHandle = window.setInterval(() => {
-    const remainingMs = Math.max(0, state.deadline - Date.now());
+    const remainingMs = getRemainingTimeMs();
     trimRecentSolveTimes();
     updateHud(remainingMs);
     if (remainingMs <= 0) {
@@ -971,6 +1774,7 @@ function returnToStart() {
   clearCountdown();
   hideScoreBanner();
   resetConfirmState();
+  resetTutorialProgress();
   audioSystem.stopMusic();
 
   state.started = false;
@@ -1001,6 +1805,9 @@ function returnToStart() {
   showOverlay(refs.leaderboardOverlay, false);
   showOverlay(refs.confirmOverlay, false);
   showOverlay(refs.countdownOverlay, false);
+  showOverlay(refs.stageIntroOverlay, false);
+  showOverlay(refs.tutorialStageBannerOverlay, false);
+  showOverlay(refs.tutorialOverlay, false);
   showOverlay(refs.startOverlay, true);
 }
 
@@ -1191,8 +1998,10 @@ function pauseGame(options = {}) {
 
   const { showPauseOverlay = true, updateStatusLine = true } = options;
 
-  state.pausedRemainingMs = Math.max(0, state.deadline - Date.now());
-  state.pausedFeverMs = Math.max(0, state.feverUntil - Date.now());
+  state.pausedRemainingMs = getRemainingTimeMs();
+  state.pausedFeverMs = state.guidanceClockFrozen
+    ? state.guidanceFeverRemainingMs
+    : Math.max(0, state.feverUntil - Date.now());
   state.pauseStartedAt = Date.now();
   state.running = false;
   state.isPaused = true;
@@ -1200,6 +2009,10 @@ function pauseGame(options = {}) {
 
   clearTimer();
   cancelDrag();
+  clearStageIntroTimer();
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
   audioSystem.pauseMusic();
   updateHud(state.pausedRemainingMs);
   refs.pauseBtn.textContent = "Tiếp tục";
@@ -1225,13 +2038,21 @@ async function resumeGame() {
   state.running = true;
   state.isPaused = false;
   state.pauseStartedAt = 0;
+  if (state.guidanceClockFrozen) {
+    state.guidanceClockRemainingMs = state.pausedRemainingMs;
+    state.guidanceFeverRemainingMs = state.pausedFeverMs;
+  }
 
   showOverlay(refs.pauseOverlay, false);
   refs.pauseBtn.textContent = "Tạm dừng";
   setStatus("Đã tiếp tục.", "neutral");
-  updateHud(state.pausedRemainingMs);
+  updateHud(getRemainingTimeMs());
   audioSystem.syncMusic({ running: true, fever: isFeverActive() });
-  startTimerLoop();
+  if (!state.guidanceClockFrozen) {
+    startTimerLoop();
+  } else if (isTutorialLevel()) {
+    scheduleTutorialHint(420);
+  }
 }
 
 function endGame(clearedAll) {
@@ -1239,7 +2060,7 @@ function endGame(clearedAll) {
     return;
   }
 
-  const remainingMs = Math.max(0, state.deadline - Date.now());
+  const remainingMs = getRemainingTimeMs();
   const completionMs = getCompletionTimeMs(remainingMs);
   state.running = false;
   state.isPaused = false;
@@ -1249,6 +2070,7 @@ function endGame(clearedAll) {
   cancelDrag();
   hideScoreBanner();
   audioSystem.stopMusic();
+  resetTutorialProgress();
   trimRecentSolveTimes();
   updateHud(0);
   const leaderboardResult = updateLeaderboard(state.playerName, state.score, completionMs);
@@ -1291,6 +2113,8 @@ function renderPalette() {
 function renderLevel() {
   const level = getCurrentLevel();
   const stage = STAGE_META[level.stage];
+  const tutorialLevel = isTutorialLevel(level);
+  setTutorialVisualState(tutorialLevel);
 
   state.placements = {};
   state.lockAdvance = false;
@@ -1300,12 +2124,20 @@ function renderLevel() {
   refs.levelBadge.textContent = `Màn ${state.currentLevelIndex + 1} / ${LEVEL_COUNT}`;
   refs.stageTitle.textContent = stage.title;
   refs.levelInstruction.textContent = level.prompt;
+  if (tutorialLevel) {
+    refs.levelBadge.textContent = `Hướng dẫn ${stage.title.toLowerCase()}`;
+    refs.stageTitle.textContent = `${stage.title} - Hướng dẫn`;
+  }
 
   refs.formulaArea.innerHTML = buildFormulaMarkup(level);
   syncFormulaSlots();
   renderDecorations(level);
   renderCurve();
-  updateHud();
+  if (!tutorialLevel) {
+    hideTutorialHint();
+  }
+  updateHud(getRemainingTimeMs());
+  requestGraphFrameSync();
 }
 
 function buildFormulaMarkup(level) {
@@ -1590,6 +2422,7 @@ function getCoefficients(overrides = {}) {
 function beginDrag(event, value) {
   event.preventDefault();
   cancelDrag();
+  noteTutorialInteraction();
 
   const ghost = document.createElement("div");
   ghost.className = "drag-ghost";
@@ -1632,6 +2465,17 @@ function onPointerUp() {
   state.ignoreSlotClickUntil = Date.now() + 250;
   syncFormulaSlots();
   renderCurve();
+
+  const level = getCurrentLevel();
+  if (level.isTutorial && level.solution[hoveredSlot] !== droppedValue) {
+    state.placements = {};
+    syncFormulaSlots();
+    renderCurve();
+    setStatus("Chưa đúng. Màn hướng dẫn đã tự reset để bạn thử lại.", "warning");
+    scheduleTutorialHint(520);
+    return;
+  }
+
   checkSolved();
 }
 
@@ -1697,6 +2541,7 @@ function clearSlot(slot) {
   if (state.placements[slot] === undefined) {
     return;
   }
+  noteTutorialInteraction();
   delete state.placements[slot];
   syncFormulaSlots();
   renderCurve();
@@ -1707,6 +2552,7 @@ function resetCurrentLevel() {
   if (!state.running || state.lockAdvance) {
     return;
   }
+  noteTutorialInteraction();
   cancelDrag();
   state.placements = {};
   syncFormulaSlots();
@@ -1732,6 +2578,15 @@ function checkSolved() {
   });
 
   if (!solved) {
+    if (level.isTutorial) {
+      state.placements = {};
+      syncFormulaSlots();
+      renderCurve();
+      setStatus("Chưa đúng. Màn hướng dẫn đã tự reset để bạn thử lại.", "warning");
+      scheduleTutorialHint(520);
+      return;
+    }
+
     state.recentSolveTimes = [];
     if (isFeverActive()) {
       applyScoreChange(0, "Fever bảo vệ: 0 điểm", "fever");
@@ -1749,6 +2604,11 @@ function checkSolved() {
 function handleSolved() {
   const now = Date.now();
   const level = getCurrentLevel();
+
+  if (level.isTutorial) {
+    handleTutorialSolved(level);
+    return;
+  }
 
   state.lockAdvance = true;
   trimRecentSolveTimes(now);
@@ -1783,7 +2643,9 @@ function handleSolved() {
     setStatus(`Chính xác! +${earned} điểm.`, "success");
   }
 
-  updateHud();
+  updateHud(getRemainingTimeMs());
+
+  const shouldShowFeverInfo = triggeredFever && !state.feverInfoShown;
 
   window.setTimeout(() => {
     refs.curvePath.classList.remove("curve-solved");
@@ -1791,15 +2653,693 @@ function handleSolved() {
       return;
     }
 
-    state.currentLevelIndex += 1;
-    if (state.currentLevelIndex >= LEVEL_COUNT) {
-      endGame(true);
+    if (shouldShowFeverInfo) {
+      state.feverInfoShown = true;
+      state.pendingSolvedAdvance = true;
+      pauseGame({ showPauseOverlay: false, updateStatusLine: false });
+      openFeverInfoOverlay();
       return;
     }
 
-    state.currentLevel = createRandomLevel(getStageForIndex(state.currentLevelIndex));
-    renderLevel();
+    continueSolvedAdvance();
   }, 1050);
+}
+
+function handleSolved() {
+  const now = Date.now();
+  const level = getCurrentLevel();
+
+  if (level.isTutorial) {
+    handleTutorialSolved(level);
+    return;
+  }
+
+  state.lockAdvance = true;
+  trimRecentSolveTimes(now);
+  state.recentSolveTimes.push(now);
+
+  let triggeredFever = false;
+  if (state.recentSolveTimes.length >= 3) {
+    const lastThree = state.recentSolveTimes.slice(-3);
+    if (lastThree[2] - lastThree[0] <= COMBO_WINDOW_MS) {
+      state.feverUntil = now + FEVER_DURATION_MS;
+      state.recentSolveTimes = [];
+      triggeredFever = true;
+      audioSystem.playFeverStinger();
+      audioSystem.syncMusic({ running: state.running, fever: true });
+    }
+  }
+
+  const feverScoring = triggeredFever || isFeverActive(now);
+  const earned = feverScoring ? CORRECT_SCORE * 2 : CORRECT_SCORE;
+  const shouldShowFeverInfo = triggeredFever && !state.feverInfoShown;
+
+  applyScoreChange(earned, feverScoring ? `FEVER: +${earned} Ä‘iá»ƒm` : `ChÃ­nh xÃ¡c: +${earned} Ä‘iá»ƒm`, feverScoring ? "fever" : "gain");
+  state.solvedCount += 1;
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+
+  if (triggeredFever) {
+    setStatus(`FEVER kÃ­ch hoáº¡t! +${earned} Ä‘iá»ƒm.`, "fever");
+  } else if (feverScoring) {
+    setStatus(`FEVER!! +${earned} Ä‘iá»ƒm.`, "fever");
+  } else {
+    setStatus(`ChÃ­nh xÃ¡c! +${earned} Ä‘iá»ƒm.`, "success");
+  }
+
+  updateHud(getRemainingTimeMs());
+
+  if (shouldShowFeverInfo) {
+    state.feverInfoShown = true;
+    state.pendingSolvedAdvance = true;
+    refs.curvePath.classList.remove("curve-solved");
+    pauseGame({ showPauseOverlay: false, updateStatusLine: false });
+    openFeverInfoOverlay();
+    return;
+  }
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+    continueSolvedAdvance();
+  }, 1050);
+}
+
+function handleSolved() {
+  const now = Date.now();
+  const level = getCurrentLevel();
+
+  if (level.isTutorial) {
+    handleTutorialSolved(level);
+    return;
+  }
+
+  state.lockAdvance = true;
+  trimRecentSolveTimes(now);
+  state.recentSolveTimes.push(now);
+
+  let triggeredFever = false;
+  if (state.recentSolveTimes.length >= 3) {
+    const lastThree = state.recentSolveTimes.slice(-3);
+    if (lastThree[2] - lastThree[0] <= COMBO_WINDOW_MS) {
+      state.feverUntil = now + FEVER_DURATION_MS;
+      state.recentSolveTimes = [];
+      triggeredFever = true;
+      audioSystem.playFeverStinger();
+      audioSystem.syncMusic({ running: state.running, fever: true });
+    }
+  }
+
+  const feverScoring = triggeredFever || isFeverActive(now);
+  const earned = feverScoring ? CORRECT_SCORE * 2 : CORRECT_SCORE;
+  const shouldShowFeverInfo = triggeredFever && !state.feverInfoShown;
+
+  applyScoreChange(
+    earned,
+    feverScoring ? `FEVER: +${earned} điểm` : `Chính xác: +${earned} điểm`,
+    feverScoring ? "fever" : "gain"
+  );
+  state.solvedCount += 1;
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+
+  if (triggeredFever) {
+    setStatus(`FEVER kích hoạt! +${earned} điểm.`, "fever");
+  } else if (feverScoring) {
+    setStatus(`FEVER!! +${earned} điểm.`, "fever");
+  } else {
+    setStatus(`Chính xác! +${earned} điểm.`, "success");
+  }
+
+  updateHud(getRemainingTimeMs());
+
+  if (shouldShowFeverInfo) {
+    state.feverInfoShown = true;
+    state.pendingSolvedAdvance = true;
+    refs.curvePath.classList.remove("curve-solved");
+    pauseGame({ showPauseOverlay: false, updateStatusLine: false });
+    openFeverInfoOverlay();
+    return;
+  }
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+    continueSolvedAdvance();
+  }, 1050);
+}
+
+function handleTutorialSolved(level) {
+  const stageMeta = STAGE_META[level.stage];
+
+  state.lockAdvance = true;
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+  setStatus(`Đã xong màn hướng dẫn. Chuẩn bị vào ${stageMeta.title.toLowerCase()}.`, "success");
+  updateHud(getRemainingTimeMs());
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+
+    state.currentLevel = createRandomLevel(level.stage);
+    renderLevel();
+    resumeClockAfterGuidance();
+    setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Bạn đã vào màn chính.`, "neutral");
+  }, 820);
+}
+
+function handleTutorialSolved(level) {
+  const stageMeta = STAGE_META[level.stage];
+
+  state.lockAdvance = true;
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+  setStatus(`Đã xong màn hướng dẫn. Chuẩn bị vào ${stageMeta.title.toLowerCase()}.`, "success");
+  updateHud(getRemainingTimeMs());
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+
+    playScreenFlash(() => {
+      if (!state.running) {
+        return;
+      }
+      state.currentLevel = createRandomLevel(level.stage);
+      setTutorialVisualState(false);
+      renderLevel();
+      resumeClockAfterGuidance();
+      setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Bạn đã vào màn chính.`, "neutral");
+    });
+  }, 260);
+}
+
+function handleTutorialSolved(level) {
+  const stageMeta = STAGE_META[level.stage];
+
+  state.lockAdvance = true;
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+  setStatus(`Đã xong màn hướng dẫn. Chuẩn bị vào ${stageMeta.title.toLowerCase()}.`, "success");
+  updateHud(getRemainingTimeMs());
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+
+    playScreenFlash(() => {
+      if (!state.running) {
+        return;
+      }
+      state.currentLevel = createRandomLevel(level.stage);
+      setTutorialVisualState(false);
+      renderLevel();
+      resumeClockAfterGuidance();
+      setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Bạn đã vào màn chính.`, "neutral");
+    });
+  }, 260);
+}
+
+function handleSolved() {
+  const now = Date.now();
+  const level = getCurrentLevel();
+
+  if (level.isTutorial) {
+    handleTutorialSolved(level);
+    return;
+  }
+
+  state.lockAdvance = true;
+  trimRecentSolveTimes(now);
+  state.recentSolveTimes.push(now);
+
+  let triggeredFever = false;
+  if (state.recentSolveTimes.length >= 3) {
+    const lastThree = state.recentSolveTimes.slice(-3);
+    if (lastThree[2] - lastThree[0] <= COMBO_WINDOW_MS) {
+      state.feverUntil = now + FEVER_DURATION_MS;
+      state.recentSolveTimes = [];
+      triggeredFever = true;
+      audioSystem.playFeverStinger();
+      audioSystem.syncMusic({ running: state.running, fever: true });
+    }
+  }
+
+  const feverScoring = triggeredFever || isFeverActive(now);
+  const earned = feverScoring ? CORRECT_SCORE * 2 : CORRECT_SCORE;
+  const shouldShowFeverInfo = triggeredFever && !state.feverInfoShown;
+
+  applyScoreChange(
+    earned,
+    feverScoring ? `FEVER: +${earned} điểm` : `Chính xác: +${earned} điểm`,
+    feverScoring ? "fever" : "gain"
+  );
+  state.solvedCount += 1;
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+
+  if (triggeredFever) {
+    setStatus(`FEVER kích hoạt! +${earned} điểm.`, "fever");
+  } else if (feverScoring) {
+    setStatus(`FEVER!! +${earned} điểm.`, "fever");
+  } else {
+    setStatus(`Chính xác! +${earned} điểm.`, "success");
+  }
+
+  updateHud(getRemainingTimeMs());
+
+  if (shouldShowFeverInfo) {
+    state.feverInfoShown = true;
+    state.pendingSolvedAdvance = true;
+    refs.curvePath.classList.remove("curve-solved");
+    pauseGame({ showPauseOverlay: false, updateStatusLine: false });
+    openFeverInfoOverlay();
+    return;
+  }
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+    continueSolvedAdvance();
+  }, 1050);
+}
+
+function handleTutorialSolved(level) {
+  const stageMeta = STAGE_META[level.stage];
+
+  state.lockAdvance = true;
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+  setStatus(`Đã xong màn hướng dẫn. Chuẩn bị vào ${stageMeta.title.toLowerCase()}.`, "success");
+  updateHud(getRemainingTimeMs());
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+
+    playScreenFlash(() => {
+      if (!state.running) {
+        return;
+      }
+      state.currentLevel = createRandomLevel(level.stage);
+      setTutorialVisualState(false);
+      renderLevel();
+      resumeClockAfterGuidance();
+      setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Bạn đã vào màn chính.`, "neutral");
+    });
+  }, 260);
+}
+
+function updateFeverInfoCopy() {
+  if (refs.feverInfoLead) {
+    refs.feverInfoLead.textContent = "";
+  }
+  if (refs.feverInfoDuration) {
+    refs.feverInfoDuration.textContent = `Fever kéo dài ${FEVER_DURATION_MS / 1000} giây.`;
+  }
+  if (refs.feverInfoTrigger) {
+    refs.feverInfoTrigger.textContent = `Ghép đúng 3 màn liên tiếp trong vòng ${COMBO_WINDOW_MS / 1000} giây để bật FEVER.`;
+  }
+}
+
+function showTutorialStageBanner(stage, onComplete) {
+  const stageMeta = STAGE_META[stage];
+  if (!stageMeta || !refs.tutorialStageBannerOverlay) {
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+    return;
+  }
+
+  clearTutorialStageBannerTimer();
+  refs.tutorialStageBannerTitle.textContent = `HƯỚNG DẪN ${stageMeta.title.toUpperCase()}`;
+  refs.tutorialStageBannerSubtitle.textContent = stageMeta.name;
+  showOverlay(refs.tutorialStageBannerOverlay, true);
+
+  state.tutorialStageBannerHandle = window.setTimeout(() => {
+    state.tutorialStageBannerHandle = null;
+    showOverlay(refs.tutorialStageBannerOverlay, false);
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, TUTORIAL_STAGE_BANNER_DURATION_MS);
+}
+
+function beginStageSequence(stage, options = {}) {
+  const { freezeClock = true } = options;
+
+  clearStageIntroTimer();
+  clearTutorialStageBannerTimer();
+  clearTutorialIdleTimer();
+  clearTutorialDemoTimers();
+  hideTutorialHint();
+  setTutorialVisualState(false);
+  audioSystem.pauseMusic();
+  if (refs.tutorialStageBannerOverlay) {
+    showOverlay(refs.tutorialStageBannerOverlay, false);
+  }
+
+  if (freezeClock) {
+    freezeClockForGuidance();
+  }
+
+  showStageIntro(stage, () => {
+    if (!state.running || state.currentLevelIndex >= LEVEL_COUNT) {
+      return;
+    }
+    finishStageSequence(stage);
+  });
+}
+
+function finishStageSequence(stage) {
+  const stageMeta = STAGE_META[stage];
+  const shouldRunTutorial = state.tutorialEnabled && !state.tutorialShownStages[stage];
+
+  if (shouldRunTutorial) {
+    state.tutorialShownStages[stage] = true;
+    showTutorialStageBanner(stage, () => {
+      if (!state.running || state.currentLevelIndex >= LEVEL_COUNT) {
+        return;
+      }
+      state.currentLevel = createTutorialLevel(stage);
+      setTutorialVisualState(true);
+      renderLevel();
+      updateHud(getRemainingTimeMs());
+      setStatus(`Màn hướng dẫn ${stageMeta.title.toLowerCase()} đã sẵn sàng. Hãy kéo số đúng vào phương trình.`, "neutral");
+      scheduleTutorialHint(260);
+    });
+    return;
+  }
+
+  state.currentLevel = createRandomLevel(stage);
+  setTutorialVisualState(false);
+  renderLevel();
+  updateHud(getRemainingTimeMs());
+  resumeClockAfterGuidance();
+
+  if (stage === 1) {
+    setStatus(`90 giây bắt đầu cho ${formatPlayerName(state.playerName)}. Kéo số để tìm quỹ đạo đường bắn.`, "neutral");
+  } else {
+    setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Kéo số để giải màn chính.`, "neutral");
+  }
+}
+
+function refreshTutorialModeUI() {
+  if (!refs.tutorialModeBtn) {
+    return;
+  }
+
+  const buttons = [refs.tutorialModeBtn, refs.confirmTutorialModeBtn].filter(Boolean);
+  const pressed = state.tutorialEnabled ? "true" : "false";
+  const checked = state.tutorialEnabled ? "true" : "false";
+  const label = state.tutorialEnabled ? "Tắt chế độ hướng dẫn" : "Bật chế độ hướng dẫn";
+
+  document.querySelectorAll(".tutorial-toggle-copy strong").forEach((node) => {
+    node.textContent = "CHẾ ĐỘ HƯỚNG DẪN";
+  });
+
+  buttons.forEach((button) => {
+    button.innerHTML = '<span class="tutorial-toggle-btn__track"><span class="tutorial-toggle-btn__thumb"></span></span>';
+    button.setAttribute("role", "switch");
+    button.setAttribute("aria-pressed", pressed);
+    button.setAttribute("aria-checked", checked);
+    button.setAttribute("aria-label", label);
+    button.classList.toggle("is-off", !state.tutorialEnabled);
+  });
+
+  if (refs.tutorialModeHint) {
+    refs.tutorialModeHint.textContent = "";
+  }
+
+  if (refs.confirmTutorialModeHint) {
+    refs.confirmTutorialModeHint.textContent = "";
+  }
+}
+
+function updateFeverInfoCopy() {
+  if (refs.feverInfoLead) {
+    refs.feverInfoLead.textContent = "";
+  }
+  if (refs.feverInfoDuration) {
+    refs.feverInfoDuration.textContent = `Fever kéo dài ${FEVER_DURATION_MS / 1000} giây.`;
+  }
+  if (refs.feverInfoTrigger) {
+    refs.feverInfoTrigger.textContent = `Ghép đúng 3 màn liên tiếp trong vòng ${COMBO_WINDOW_MS / 1000} giây để bật FEVER.`;
+  }
+}
+
+function renderLevel() {
+  const level = getCurrentLevel();
+  const stage = STAGE_META[level.stage];
+  const tutorialLevel = isTutorialLevel(level);
+  setTutorialVisualState(tutorialLevel);
+
+  state.placements = {};
+  state.lockAdvance = false;
+  state.drag = null;
+
+  refs.app.dataset.stage = String(level.stage);
+  refs.levelBadge.textContent = `Màn ${state.currentLevelIndex + 1} / ${LEVEL_COUNT}`;
+  refs.stageTitle.textContent = stage.title;
+  refs.levelInstruction.textContent = level.prompt;
+
+  if (tutorialLevel) {
+    refs.levelBadge.textContent = "HƯỚNG DẪN";
+    refs.stageTitle.textContent = stage.title.toUpperCase();
+    refs.levelInstruction.textContent = level.stage === 1
+      ? "Hướng dẫn: tìm hệ số a để đường thẳng đi qua điểm A(1; 2)."
+      : level.prompt;
+  }
+
+  refs.formulaArea.innerHTML = buildFormulaMarkup(level);
+  syncFormulaSlots();
+  renderDecorations(level);
+  renderCurve();
+  if (!tutorialLevel) {
+    hideTutorialHint();
+  }
+  updateHud(getRemainingTimeMs());
+}
+
+function handleSolved() {
+  const now = Date.now();
+  const level = getCurrentLevel();
+
+  if (level.isTutorial) {
+    handleTutorialSolved(level);
+    return;
+  }
+
+  state.lockAdvance = true;
+  trimRecentSolveTimes(now);
+  state.recentSolveTimes.push(now);
+
+  let triggeredFever = false;
+  if (state.recentSolveTimes.length >= 3) {
+    const lastThree = state.recentSolveTimes.slice(-3);
+    if (lastThree[2] - lastThree[0] <= COMBO_WINDOW_MS) {
+      state.feverUntil = now + FEVER_DURATION_MS;
+      state.recentSolveTimes = [];
+      triggeredFever = true;
+      audioSystem.playFeverStinger();
+      audioSystem.syncMusic({ running: state.running, fever: true });
+    }
+  }
+
+  const feverScoring = triggeredFever || isFeverActive(now);
+  const earned = feverScoring ? CORRECT_SCORE * 2 : CORRECT_SCORE;
+  const shouldShowFeverInfo = triggeredFever && state.tutorialEnabled && !state.feverInfoShown;
+
+  applyScoreChange(
+    earned,
+    feverScoring ? `FEVER: +${earned} điểm` : `Chính xác: +${earned} điểm`,
+    feverScoring ? "fever" : "gain"
+  );
+  state.solvedCount += 1;
+  refs.curvePath.classList.remove("curve-solved");
+  void refs.curvePath.getBoundingClientRect();
+  refs.curvePath.classList.add("curve-solved");
+
+  if (triggeredFever) {
+    setStatus(`FEVER kích hoạt! +${earned} điểm.`, "fever");
+  } else if (feverScoring) {
+    setStatus(`FEVER!! +${earned} điểm.`, "fever");
+  } else {
+    setStatus(`Chính xác! +${earned} điểm.`, "success");
+  }
+
+  updateHud(getRemainingTimeMs());
+
+  if (shouldShowFeverInfo) {
+    state.feverInfoShown = true;
+    state.pendingSolvedAdvance = true;
+    refs.curvePath.classList.remove("curve-solved");
+    pauseGame({ showPauseOverlay: false, updateStatusLine: false });
+    openFeverInfoOverlay();
+    return;
+  }
+
+  window.setTimeout(() => {
+    refs.curvePath.classList.remove("curve-solved");
+    if (!state.running) {
+      return;
+    }
+    continueSolvedAdvance();
+  }, 1050);
+}
+
+function finishStageSequence(stage) {
+  const stageMeta = STAGE_META[stage];
+  const shouldRunTutorial = state.tutorialEnabled && !state.tutorialShownStages[stage];
+
+  if (shouldRunTutorial) {
+    state.tutorialShownStages[stage] = true;
+    showTutorialStageBanner(stage, () => {
+      if (!state.running || state.currentLevelIndex >= LEVEL_COUNT) {
+        return;
+      }
+      state.currentLevel = createTutorialLevel(stage);
+      setTutorialVisualState(true);
+      renderLevel();
+      updateHud(getRemainingTimeMs());
+      setStatus("", "neutral");
+      scheduleTutorialHint(260);
+    });
+    return;
+  }
+
+  state.currentLevel = createRandomLevel(stage);
+  setTutorialVisualState(false);
+  renderLevel();
+  updateHud(getRemainingTimeMs());
+  resumeClockAfterGuidance();
+
+  if (stage === 1) {
+    setStatus(`90 giây bắt đầu cho ${formatPlayerName(state.playerName)}. Tìm số để khóa quỹ đạo đường bắn.`, "neutral");
+  } else {
+    setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Tìm số để giải màn chính.`, "neutral");
+  }
+}
+
+function continueSolvedAdvance() {
+  if (!state.running) {
+    return;
+  }
+
+  state.currentLevelIndex += 1;
+  if (state.currentLevelIndex >= LEVEL_COUNT) {
+    endGame(true);
+    return;
+  }
+
+  const nextStage = getStageForIndex(state.currentLevelIndex);
+  if (isFirstLevelOfStage(state.currentLevelIndex)) {
+    beginStageSequence(nextStage, { freezeClock: true });
+    return;
+  }
+
+  state.currentLevel = createRandomLevel(nextStage);
+  renderLevel();
+}
+
+function renderLevel() {
+  const level = getCurrentLevel();
+  const stage = STAGE_META[level.stage];
+  const tutorialLevel = isTutorialLevel(level);
+  setTutorialVisualState(tutorialLevel);
+
+  state.placements = {};
+  state.lockAdvance = false;
+  state.drag = null;
+
+  refs.app.dataset.stage = String(level.stage);
+  refs.levelBadge.textContent = `Màn ${state.currentLevelIndex + 1} / ${LEVEL_COUNT}`;
+  refs.stageTitle.textContent = stage.title;
+  refs.levelInstruction.textContent = level.prompt;
+
+  if (tutorialLevel) {
+    refs.levelBadge.textContent = "HƯỚNG DẪN";
+    refs.stageTitle.textContent = stage.title.toUpperCase();
+    refs.levelInstruction.textContent = level.stage === 1
+      ? "Tìm hệ số a để đường thẳng đi qua điểm A(1; 2)."
+      : level.prompt.replace(/^Hướng dẫn:\s*/i, "");
+  }
+
+  refs.formulaArea.innerHTML = buildFormulaMarkup(level);
+  syncFormulaSlots();
+  renderDecorations(level);
+  renderCurve();
+  if (!tutorialLevel) {
+    hideTutorialHint();
+  }
+  updateHud(getRemainingTimeMs());
+}
+
+function finishStageSequence(stage) {
+  const stageMeta = STAGE_META[stage];
+  const shouldRunTutorial = state.tutorialEnabled && !state.tutorialShownStages[stage];
+
+  if (shouldRunTutorial) {
+    state.tutorialShownStages[stage] = true;
+    showTutorialStageBanner(stage, () => {
+      if (!state.running || state.currentLevelIndex >= LEVEL_COUNT) {
+        return;
+      }
+      state.currentLevel = createTutorialLevel(stage);
+      setTutorialVisualState(true);
+      renderLevel();
+      updateHud(getRemainingTimeMs());
+      setStatus("", "neutral");
+      scheduleTutorialHint(260);
+    });
+    return;
+  }
+
+  state.currentLevel = createRandomLevel(stage);
+  setTutorialVisualState(false);
+  renderLevel();
+  updateHud(getRemainingTimeMs());
+  resumeClockAfterGuidance();
+
+  if (stage === 1) {
+    setStatus(`120 giây bắt đầu cho ${formatPlayerName(state.playerName)}. Tìm số để khóa quỹ đạo đường bắn.`, "neutral");
+  } else {
+    setStatus(`Bắt đầu ${stageMeta.title.toLowerCase()}. Tìm số để giải màn chính.`, "neutral");
+  }
 }
 
 function trimRecentSolveTimes(now = Date.now()) {
@@ -1810,8 +3350,9 @@ function isFeverActive(now = Date.now()) {
   return now < state.feverUntil;
 }
 
-function updateHud(remainingMs = Math.max(0, state.deadline - Date.now())) {
+function updateHud(remainingMs = getRemainingTimeMs()) {
   const timeSeconds = state.running ? remainingMs / 1000 : Math.max(0, remainingMs / 1000);
+  const quietMode = state.guidanceClockFrozen || isTutorialLevel();
   trimRecentSolveTimes();
 
   refs.timeValue.textContent = `${timeSeconds.toFixed(1)}s`;
@@ -1825,6 +3366,13 @@ function updateHud(remainingMs = Math.max(0, state.deadline - Date.now())) {
     return;
   }
 
+  if (state.guidanceClockFrozen && state.guidanceFeverRemainingMs > 0) {
+    refs.feverValue.textContent = `Tạm giữ ${(state.guidanceFeverRemainingMs / 1000).toFixed(1)}s`;
+    refs.body.classList.add("fever-active");
+    audioSystem.syncMusic({ running: false, fever: false });
+    return;
+  }
+
   if (isFeverActive()) {
     const feverLeft = Math.max(0, (state.feverUntil - Date.now()) / 1000);
     refs.feverValue.textContent = `Đang bật ${feverLeft.toFixed(1)}s`;
@@ -1834,7 +3382,7 @@ function updateHud(remainingMs = Math.max(0, state.deadline - Date.now())) {
     refs.body.classList.remove("fever-active");
   }
 
-  audioSystem.syncMusic({ running: state.running, fever: isFeverActive() });
+  audioSystem.syncMusic({ running: quietMode ? false : state.running, fever: quietMode ? false : isFeverActive() });
 }
 
 function setStatus(message, tone) {
@@ -1933,7 +3481,7 @@ function createStageOneLevel() {
     formula: "linearOrigin",
     slots: ["a"],
     baseScore: 110,
-    prompt: `Kéo hệ số a để đường thẳng đi qua điểm ${label}(${formatNumber(pick.x)}; ${formatNumber(pick.y)}).`,
+    prompt: `Tìm hệ số a để đường thẳng đi qua điểm ${label}(${formatNumber(pick.x)}; ${formatNumber(pick.y)}).`,
     targets: [{ x: pick.x, y: pick.y, label, style: "star" }]
   };
 }
@@ -1996,6 +3544,42 @@ function createStageThreeLevel() {
       { x: pick.x, y: pick.y, label: labels[2], style: "star" }
     ]
   };
+}
+
+function levelSignature(level) {
+  if (!level) {
+    return "";
+  }
+
+  return JSON.stringify({
+    stage: level.stage,
+    formula: level.formula,
+    prompt: level.prompt,
+    targets: level.targets,
+    gate: level.gate,
+    solution: level.solution
+  });
+}
+
+function createRandomLevel(stage) {
+  const factory = stage === 1
+    ? createStageOneLevel
+    : stage === 2
+      ? createStageTwoLevel
+      : createStageThreeLevel;
+  const previousSignature = state.currentLevel && !state.currentLevel.isTutorial
+    ? levelSignature(state.currentLevel)
+    : "";
+
+  let nextLevel = factory();
+  let attempts = 0;
+
+  while (previousSignature && levelSignature(nextLevel) === previousSignature && attempts < 24) {
+    nextLevel = factory();
+    attempts += 1;
+  }
+
+  return nextLevel;
 }
 
 function xToSvg(x) {
