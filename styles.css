@@ -78,12 +78,20 @@ body.fever-active {
     linear-gradient(155deg, #2b1022, #12253c);
 }
 
+body.tutorial-active {
+  background:
+    radial-gradient(circle at top left, rgba(96, 180, 255, 0.28), transparent 34%),
+    radial-gradient(circle at 82% 14%, rgba(255, 223, 145, 0.18), transparent 24%),
+    linear-gradient(155deg, #10283f, #1b3f5f);
+  color: var(--text);
+}
+
 .app-shell {
   position: relative;
   z-index: 1;
   width: min(1340px, calc(100vw - 24px));
   margin: 0 auto;
-  height: calc(100vh - var(--footer-banner-height));
+  min-height: calc(100vh - var(--footer-banner-height));
   padding: 10px 0 calc(var(--footer-banner-height) - 50px);
   display: grid;
   grid-template-rows: auto 1fr;
@@ -248,13 +256,16 @@ body.fever-active .fever-card::after {
   display: grid;
   grid-template-columns: 520px minmax(0, 1fr);
   gap: 12px;
+  height: 100%;
   min-height: 0;
+  align-items: stretch;
 }
 
 .control-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
   min-height: 0;
   max-width: 520px;
 }
@@ -287,6 +298,24 @@ body.fever-active .fever-card::after {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.tutorial-board-label {
+  display: none;
+  align-self: center;
+  margin: -2px 0 2px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 209, 102, 0.28);
+  color: #15324b;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.tutorial-active .tutorial-board-label {
+  display: inline-flex;
 }
 
 .formula-board {
@@ -525,6 +554,60 @@ body.fever-active .fever-card::after {
   color: var(--danger);
 }
 
+body.tutorial-active .hud-card,
+body.tutorial-active .panel-card,
+body.tutorial-active .graph-panel {
+  background: rgba(18, 47, 76, 0.82);
+  border-color: rgba(132, 197, 255, 0.18);
+  box-shadow: 0 24px 52px rgba(4, 16, 29, 0.36);
+}
+
+body.tutorial-active .hud-label,
+body.tutorial-active .subtitle,
+body.tutorial-active .instruction,
+body.tutorial-active .status-line,
+body.tutorial-active .graph-legend,
+body.tutorial-active .overlay-card p,
+body.tutorial-active .overlay-card li,
+body.tutorial-active .target-label,
+body.tutorial-active .tick-label,
+body.tutorial-active .axis-label {
+  color: #bfd5ea;
+}
+
+body.tutorial-active .brand h1,
+body.tutorial-active .section-head h2,
+body.tutorial-active .graph-header h2,
+body.tutorial-active .hud-card strong {
+  color: #f4f8ff;
+}
+
+body.tutorial-active .formula-board,
+body.tutorial-active .graph-frame {
+  background:
+    radial-gradient(circle at top left, rgba(111, 231, 255, 0.12), transparent 38%),
+    linear-gradient(160deg, rgba(18, 47, 76, 0.96), rgba(8, 26, 45, 0.96));
+  border-color: rgba(132, 197, 255, 0.2);
+}
+
+body.tutorial-active .graph-backdrop {
+  fill: rgba(10, 31, 50, 0.92);
+}
+
+body.tutorial-active .grid-line {
+  stroke: rgba(143, 194, 246, 0.12);
+}
+
+body.tutorial-active .axis-line {
+  stroke: rgba(217, 236, 255, 0.45);
+}
+
+body.tutorial-active .formula-token,
+body.tutorial-active .number-chip,
+body.tutorial-active .drop-slot {
+  color: #eef6ff;
+}
+
 .score-banner {
   position: fixed;
   top: 26px;
@@ -589,6 +672,7 @@ body.fever-active .fever-card::after {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 73%;
   min-height: 0;
 }
 
@@ -791,7 +875,7 @@ body.fever-active .fever-card::after {
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.24s ease, visibility 0.24s ease;
-  z-index: 30;
+  z-index: 48;
 }
 
 .overlay.is-visible {
@@ -814,6 +898,382 @@ body.fever-active .fever-card::after {
 .overlay-card h2 {
   margin: 10px 0 12px;
   font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.stage-intro-overlay {
+  background: rgba(2, 10, 19, 0.48);
+  z-index: 50;
+}
+
+.tutorial-stage-banner-overlay {
+  background: rgba(2, 10, 19, 0.18);
+  z-index: 51;
+}
+
+.stage-intro-card {
+  width: min(760px, calc(100vw - 32px));
+  padding: 34px 30px;
+  border-radius: 32px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 102, 0.16), transparent 26%),
+    linear-gradient(160deg, rgba(10, 33, 56, 0.95), rgba(4, 18, 31, 0.95));
+  border: 1px solid rgba(159, 204, 255, 0.16);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.38);
+}
+
+.stage-intro-card h2 {
+  margin: 8px 0;
+  font-size: clamp(2.5rem, 6vw, 4.3rem);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.stage-intro-subtitle,
+.stage-intro-lead {
+  display: none;
+}
+
+.tutorial-stage-banner {
+  width: min(1040px, calc(100vw - 40px));
+  min-height: 108px;
+  padding: 24px 40px;
+  border-radius: 999px;
+  text-align: center;
+  background:
+    radial-gradient(circle at left center, rgba(255, 209, 102, 0.14), transparent 22%),
+    radial-gradient(circle at right center, rgba(111, 231, 255, 0.16), transparent 22%),
+    linear-gradient(90deg, rgba(12, 36, 59, 0.96), rgba(18, 52, 82, 0.96));
+  border: 1px solid rgba(145, 210, 255, 0.16);
+  box-shadow: 0 26px 68px rgba(0, 0, 0, 0.34);
+}
+
+.tutorial-stage-banner h2 {
+  margin: 0;
+  color: #f7fbff;
+  font-size: clamp(1.55rem, 4.2vw, 2.8rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tutorial-stage-banner p {
+  margin-top: 8px;
+  color: #b8d3eb;
+  font-size: clamp(0.9rem, 2vw, 1.12rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fever-info-overlay {
+  z-index: 52;
+}
+
+.fever-info-card {
+  width: min(820px, 100%);
+}
+
+.fever-info-lead {
+  width: min(100%, 38rem);
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.fever-info-list {
+  width: min(100%, 36rem);
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.tutorial-hint-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 36;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.tutorial-hint-layer.is-visible {
+  opacity: 1;
+}
+
+.tutorial-hint-bubble {
+  --tutorial-hint-arrow-offset: 50%;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: min(330px, calc(100vw - 24px));
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(255, 209, 102, 0.96), rgba(255, 154, 92, 0.94));
+  color: #132334;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.45;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.tutorial-hint-bubble::after {
+  content: "";
+  position: absolute;
+  left: var(--tutorial-hint-arrow-offset);
+  bottom: -10px;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 176, 96, 0.96);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 4px;
+}
+
+.tutorial-hint-bubble.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tutorial-hint-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255, 209, 102, 0.62), rgba(255, 123, 84, 0.58));
+  color: #0d2030;
+  font-size: 1.55rem;
+  font-weight: 800;
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  z-index: 1;
+}
+
+.tutorial-hint-ghost.is-visible {
+  opacity: 0.82;
+}
+
+.tutorial-hint-ghost.is-animating {
+  transition: transform 0.86s cubic-bezier(0.2, 0.8, 0.22, 1);
+}
+
+.screen-flash-overlay {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.42)),
+    rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  transition: opacity 0.22s ease, visibility 0.22s ease, backdrop-filter 0.8s ease, -webkit-backdrop-filter 0.8s ease;
+  z-index: 58;
+}
+
+.screen-flash-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.drop-slot.tutorial-drop-target {
+  border-color: rgba(255, 209, 102, 0.92);
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.12);
+}
+
+.tutorial-overlay {
+  z-index: 52;
+}
+
+.tutorial-screen.large-overlay-card {
+  width: min(980px, 100%);
+}
+
+.tutorial-screen > .section-kicker,
+.tutorial-screen > h2,
+.tutorial-screen > .tutorial-lead {
+  text-align: center;
+}
+
+.tutorial-lead {
+  width: min(100%, 46rem);
+  margin: 0 auto;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.tutorial-demo-card {
+  margin-top: 26px;
+  padding: 24px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 102, 0.14), transparent 24%),
+    linear-gradient(160deg, rgba(7, 24, 40, 0.9), rgba(4, 18, 31, 0.88));
+  border: 1px solid rgba(159, 204, 255, 0.14);
+}
+
+.tutorial-demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: var(--muted);
+}
+
+.tutorial-demo-head strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.tutorial-demo-head span {
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tutorial-playground {
+  position: relative;
+  padding: 96px 20px 18px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(111, 231, 255, 0.1), transparent 18%),
+    rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.tutorial-formula-board {
+  min-height: 88px;
+  justify-content: center;
+}
+
+.tutorial-formula-area {
+  justify-content: center;
+}
+
+.tutorial-demo-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  pointer-events: none;
+}
+
+.tutorial-slot-target {
+  border-color: rgba(255, 209, 102, 0.92);
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.12);
+}
+
+.tutorial-slot-hit {
+  animation: tutorial-slot-hit 0.4s ease;
+}
+
+.tutorial-palette-wrap {
+  margin-top: 18px;
+}
+
+.tutorial-palette-label {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tutorial-palette {
+  pointer-events: none;
+}
+
+.tutorial-chip {
+  cursor: default;
+  position: relative;
+  pointer-events: none;
+}
+
+.tutorial-chip-source {
+  border-color: rgba(255, 209, 102, 0.72);
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.12), 0 16px 28px rgba(0, 0, 0, 0.18);
+}
+
+.tutorial-callout {
+  --tutorial-arrow-offset: 50%;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: min(320px, calc(100% - 24px));
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(255, 209, 102, 0.96), rgba(255, 154, 92, 0.94));
+  color: #132334;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.45;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.tutorial-callout::after {
+  content: "";
+  position: absolute;
+  left: var(--tutorial-arrow-offset);
+  bottom: -10px;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 176, 96, 0.96);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 4px;
+}
+
+.tutorial-callout.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tutorial-ghost-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255, 209, 102, 0.95), rgba(255, 123, 84, 0.92));
+  color: #0d2030;
+  font-size: 1.55rem;
+  font-weight: 800;
+  box-shadow: 0 22px 38px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tutorial-ghost-chip.is-visible {
+  opacity: 0.84;
+}
+
+.tutorial-ghost-chip.is-animating {
+  transition: transform 0.86s cubic-bezier(0.2, 0.8, 0.22, 1);
+}
+
+@keyframes tutorial-slot-hit {
+  0% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .start-screen {
@@ -945,6 +1405,117 @@ body.fever-active .fever-card::after {
 
 .input-error.is-visible {
   opacity: 1;
+}
+
+.tutorial-toggle-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+}
+
+.tutorial-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tutorial-toggle-copy strong {
+  color: var(--text);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+}
+
+.tutorial-toggle-copy p {
+  display: none;
+}
+
+.tutorial-toggle-btn {
+  position: relative;
+  width: 58px;
+  min-width: 58px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.tutorial-toggle-btn__track {
+  position: relative;
+  display: block;
+  width: 58px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #7de28d, #3ebc63);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 10px 18px rgba(31, 103, 58, 0.22);
+  transition: background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.tutorial-toggle-btn__track::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent);
+}
+
+.tutorial-toggle-btn::after {
+  content: attr(aria-pressed);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.tutorial-toggle-btn__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #edf5fb);
+  box-shadow: 0 6px 12px rgba(3, 20, 38, 0.18);
+  transform: translateX(24px);
+  transition: transform 0.2s ease;
+}
+
+.tutorial-toggle-btn.is-off .tutorial-toggle-btn__track {
+  background: linear-gradient(145deg, #c5d2de, #9eb2c4);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 18px rgba(41, 64, 86, 0.16);
+}
+
+.tutorial-toggle-btn.is-off .tutorial-toggle-btn__thumb {
+  transform: translateX(0);
+}
+
+.tutorial-toggle-card.is-hidden {
+  display: none;
+}
+
+.end-tutorial-toggle,
+.confirm-tutorial-toggle {
+  width: min(100%, 640px);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.end-tutorial-toggle {
+  display: none;
 }
 
 .leaderboard-list {
@@ -1260,12 +1831,70 @@ body.fever-active .fever-card::after {
     padding: 30px 24px;
   }
 
+  .stage-intro-card {
+    padding: 28px 22px;
+  }
+
+  .stage-intro-card h2 {
+    font-size: clamp(2rem, 9vw, 3.4rem);
+  }
+
+  .tutorial-stage-banner {
+    min-height: 96px;
+    padding: 22px 24px;
+  }
+
+  .stage-intro-subtitle {
+    font-size: 0.96rem;
+  }
+
+  .tutorial-hint-bubble {
+    width: min(296px, calc(100vw - 20px));
+    font-size: 0.9rem;
+  }
+
+  .tutorial-hint-ghost {
+    width: 72px;
+    height: 72px;
+    font-size: 1.36rem;
+  }
+
   .start-layout {
     grid-template-columns: 1fr;
   }
 
   .hero-stats {
     display: block;
+  }
+
+  .tutorial-toggle-card {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .tutorial-toggle-btn {
+    margin: 0 auto;
+  }
+
+  .tutorial-demo-head {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .tutorial-playground {
+    padding: 112px 14px 16px;
+  }
+
+  .tutorial-callout {
+    width: calc(100% - 24px);
+    font-size: 0.9rem;
+  }
+
+  .tutorial-ghost-chip {
+    width: 72px;
+    height: 72px;
+    font-size: 1.36rem;
   }
 
   .school-banner {
@@ -1308,6 +1937,62 @@ body.fever-active .fever-card::after {
 
   .end-stats {
     grid-template-columns: 1fr;
+  }
+
+  .tutorial-demo-card {
+    padding: 18px 14px;
+  }
+
+  .tutorial-playground {
+    padding: 122px 10px 12px;
+  }
+
+  .stage-intro-card {
+    padding: 24px 18px;
+  }
+
+  .tutorial-stage-banner {
+    border-radius: 28px;
+    min-height: 88px;
+    padding: 18px 18px;
+  }
+
+  .tutorial-stage-banner h2 {
+    font-size: clamp(1.18rem, 6.2vw, 1.9rem);
+    letter-spacing: 0.08em;
+  }
+
+  .tutorial-stage-banner p {
+    font-size: 0.82rem;
+  }
+
+  .stage-intro-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .stage-intro-lead {
+    font-size: 0.92rem;
+  }
+
+  .tutorial-hint-bubble {
+    width: min(260px, calc(100vw - 16px));
+    font-size: 0.84rem;
+  }
+
+  .tutorial-hint-ghost {
+    width: 64px;
+    height: 64px;
+    font-size: 1.22rem;
+  }
+
+  .tutorial-callout {
+    font-size: 0.84rem;
+  }
+
+  .tutorial-ghost-chip {
+    width: 64px;
+    height: 64px;
+    font-size: 1.22rem;
   }
 
   .school-banner {
